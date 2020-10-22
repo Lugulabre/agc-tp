@@ -21,7 +21,7 @@ import statistics
 from collections import Counter
 # https://github.com/briney/nwalign3
 # ftp://ftp.ncbi.nih.gov/blast/matrices/
-import nwalign3 as nw
+#import nwalign3 as nw
 
 __author__ = "Maël Pretet"
 __copyright__ = "Universite Paris Diderot"
@@ -55,7 +55,7 @@ def get_arguments():
     parser = argparse.ArgumentParser(description=__doc__, usage=
                                      "{0} -h"
                                      .format(sys.argv[0]))
-    parser.add_argument('-i', '-amplicon_file', dest='amplicon_file', type=isfile, required=True, 
+    parser.add_argument('-i', '-amplicon_file', dest='amplicon_file', type=isfile, required=True,
                         help="Amplicon is a compressed fasta file (.fasta.gz)")
     parser.add_argument('-s', '-minseqlen', dest='minseqlen', type=int, default = 400,
                         help="Minimum sequence length for dereplication")
@@ -104,10 +104,47 @@ def dereplication_fulllength(amplicon_file, minseqlen, mincount):
 
 
 def get_chunks(sequence, chunk_size):
-    pass
+    list_sub_seq = []
+    for i in range(0, len(sequence), chunk_size):
+        if i+chunk_size < len(sequence):
+            list_sub_seq.append(sequence[i:i+chunk_size])
+
+    if len(list_sub_seq) >= 4:
+        return list_sub_seq
+    else:
+        raise ValueError
 
 
 def cut_kmer(sequence, kmer_size):
+    for i in range(0, len(sequence)-kmer_size+1):
+        yield sequence[i:i+kmer_size]
+
+
+def get_unique_kmer(kmer_dict, sequence, id_seq, kmer_size):
+    for kmer in cut_kmer(sequence, kmer_size):
+        if not kmer in kmer_dict.keys():
+            kmer_dict[kmer] = [id_seq]
+        else:
+            kmer_dict[kmer].append(id_seq)
+
+    return kmer_dict
+
+
+def search_mates(kmer_dict, sequence, kmer_size):
+    return [i[0] for i in Counter([ids 
+        for kmer in cut_kmer(sequence, kmer_size) if kmer in kmer_dict 
+        for ids in kmer_dict[kmer]]).most_common(8)]
+
+
+def get_identity(alignment_list):
+    count_base = 0
+    for i in range(0, len(alignment_list[0])):
+        if alignment_list[0][i] == alignment_list[1][i]:
+            count_base += 1
+    return count_base / len(alignment_list[0]) * 100
+
+
+def detect_chimera(perc_identity_matrix):
     pass
 
 #==============================================================
