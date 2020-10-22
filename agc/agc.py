@@ -23,13 +23,13 @@ from collections import Counter
 # ftp://ftp.ncbi.nih.gov/blast/matrices/
 import nwalign3 as nw
 
-__author__ = "Your Name"
+__author__ = "Maël Pretet"
 __copyright__ = "Universite Paris Diderot"
-__credits__ = ["Your Name"]
+__credits__ = ["Pretet"]
 __license__ = "GPL"
 __version__ = "1.0.0"
-__maintainer__ = "Your Name"
-__email__ = "your@email.fr"
+__maintainer__ = "Pretet"
+__email__ = "pretetmael@gmail.com"
 __status__ = "Developpement"
 
 
@@ -55,7 +55,7 @@ def get_arguments():
     parser = argparse.ArgumentParser(description=__doc__, usage=
                                      "{0} -h"
                                      .format(sys.argv[0]))
-    parser.add_argument('-i', '-amplicon_file', dest='amplicon_file', type=isfile, required=True, 
+    parser.add_argument('-i', '-amplicon_file', dest='amplicon_file', type=isfile, required=True,
                         help="Amplicon is a compressed fasta file (.fasta.gz)")
     parser.add_argument('-s', '-minseqlen', dest='minseqlen', type=int, default = 400,
                         help="Minimum sequence length for dereplication")
@@ -68,6 +68,127 @@ def get_arguments():
     parser.add_argument('-o', '-output_file', dest='output_file', type=str,
                         default="OTU.fasta", help="Output file")
     return parser.parse_args()
+
+
+def read_fasta(amplicon_file, minseqlen):
+    if amplicon_file.endswith("gz"):
+        filin = gzip.open(amplicon_file, "r")
+    else:
+        filin = open(amplicon_file, "r")
+
+    seq = ""
+    for line in filin:
+        if line.startswith(">"):
+            if len(seq) >= minseqlen:
+                yield seq
+            seq = ""
+        else:
+            seq += line.strip()
+    
+    yield seq
+    filin.close()
+
+
+
+def dereplication_fulllength(amplicon_file, minseqlen, mincount):
+    dict_amplicon = {}
+    for amplicon in read_fasta(amplicon_file, minseqlen):
+        if not amplicon in dict_amplicon.keys():
+            dict_amplicon[amplicon] = 1
+        else:
+            dict_amplicon[amplicon] += 1
+
+    for key, value in sorted(dict_amplicon.items(), key=lambda x: x[1], reverse = True):
+        if value >= mincount:
+            yield [key, value]
+
+
+def get_chunks(sequence, chunk_size):
+    list_sub_seq = []
+    for i in range(0, len(sequence), chunk_size):
+        if i+chunk_size < len(sequence):
+            list_sub_seq.append(sequence[i:i+chunk_size])
+
+    if len(list_sub_seq) >= 4:
+        return list_sub_seq
+    else:
+        raise ValueError
+
+
+def get_unique(ids):
+    return {}.fromkeys(ids).keys()
+
+
+def common(lst1, lst2): 
+    return list(set(lst1) & set(lst2))
+
+
+def cut_kmer(sequence, kmer_size):
+    for i in range(0, len(sequence)-kmer_size+1):
+        yield sequence[i:i+kmer_size]
+
+
+def get_unique_kmer(kmer_dict, sequence, id_seq, kmer_size):
+    for kmer in cut_kmer(sequence, kmer_size):
+        if not kmer in kmer_dict.keys():
+            kmer_dict[kmer] = [id_seq]
+        else:
+            kmer_dict[kmer].append(id_seq)
+
+    return kmer_dict
+
+
+def search_mates(kmer_dict, sequence, kmer_size):
+    return [i[0] for i in Counter([ids 
+        for kmer in cut_kmer(sequence, kmer_size) if kmer in kmer_dict 
+        for ids in kmer_dict[kmer]]).most_common(8)]
+
+
+def get_identity(alignment_list):
+    count_base = 0
+    for i in range(0, len(alignment_list[0])):
+        if alignment_list[0][i] == alignment_list[1][i]:
+            count_base += 1
+    return count_base / len(alignment_list[0]) * 100
+
+
+def detect_chimera(perc_identity_matrix):
+    sum_stdev = 0
+    bool1_seq = False
+    bool2_seq = False
+    for i in range(0, len(perc_identity_matrix)):
+        sum_stdev += statistics.stdev(perc_identity_matrix[i])
+        if perc_identity_matrix[i][0] > perc_identity_matrix[i][1]:
+            bool1_seq = True
+        if perc_identity_matrix[i][1] > perc_identity_matrix[i][0]:
+            bool2_seq = True
+
+    if sum_stdev / len(perc_identity_matrix) > 5 and bool1_seq and bool2_seq:
+        return True
+    
+    return False
+
+
+def chimera_removal(amplicon_file, minseqlen, mincount, chunk_size, kmer_size):
+    for i in dereplication_fulllength(amplicon_file, minseqlen, mincount):
+        pass
+    pass
+
+
+def abundance_greedy_clustering(amplicon_file, minseqlen, mincount, chunk_size, kmer_size):
+    chimera_removal(amplicon_file, minseqlen, mincount, chunk_size, kmer_size)
+
+
+def fill(text, width=80):
+    '''Diviser le texte avec un retour à la ligne pour respecter le format fasta
+    '''
+    return os.linesep.join(text[i:i+width] for i in range(0, len(text), width))
+
+
+def write_OTU(OTU_list, output_file):
+    with open(output_file, "w") as filout:
+        for i in range(0,len(OTU_list)):
+            filout.write(">OTU_{} occurrence: {}\n{}\n".format(i, OTU_list[i][1], fill(OTU_list[i][0])))
 
 #==============================================================
 # Main program
