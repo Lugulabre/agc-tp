@@ -21,7 +21,7 @@ import statistics
 from collections import Counter
 # https://github.com/briney/nwalign3
 # ftp://ftp.ncbi.nih.gov/blast/matrices/
-#import nwalign3 as nw
+import nwalign3 as nw
 
 __author__ = "Maël Pretet"
 __copyright__ = "Universite Paris Diderot"
@@ -115,6 +115,14 @@ def get_chunks(sequence, chunk_size):
         raise ValueError
 
 
+def get_unique(ids):
+    return {}.fromkeys(ids).keys()
+
+
+def common(lst1, lst2): 
+    return list(set(lst1) & set(lst2))
+
+
 def cut_kmer(sequence, kmer_size):
     for i in range(0, len(sequence)-kmer_size+1):
         yield sequence[i:i+kmer_size]
@@ -145,7 +153,42 @@ def get_identity(alignment_list):
 
 
 def detect_chimera(perc_identity_matrix):
+    sum_stdev = 0
+    bool1_seq = False
+    bool2_seq = False
+    for i in range(0, len(perc_identity_matrix)):
+        sum_stdev += statistics.stdev(perc_identity_matrix[i])
+        if perc_identity_matrix[i][0] > perc_identity_matrix[i][1]:
+            bool1_seq = True
+        if perc_identity_matrix[i][1] > perc_identity_matrix[i][0]:
+            bool2_seq = True
+
+    if sum_stdev / len(perc_identity_matrix) > 5 and bool1_seq and bool2_seq:
+        return True
+    
+    return False
+
+
+def chimera_removal(amplicon_file, minseqlen, mincount, chunk_size, kmer_size):
+    for i in dereplication_fulllength(amplicon_file, minseqlen, mincount):
+        pass
     pass
+
+
+def abundance_greedy_clustering(amplicon_file, minseqlen, mincount, chunk_size, kmer_size):
+    chimera_removal(amplicon_file, minseqlen, mincount, chunk_size, kmer_size)
+
+
+def fill(text, width=80):
+    '''Diviser le texte avec un retour à la ligne pour respecter le format fasta
+    '''
+    return os.linesep.join(text[i:i+width] for i in range(0, len(text), width))
+
+
+def write_OTU(OTU_list, output_file):
+    with open(output_file, "w") as filout:
+        for i in range(0,len(OTU_list)):
+            filout.write(">OTU_{} occurrence: {}\n{}\n".format(i, OTU_list[i][1], fill(OTU_list[i][0])))
 
 #==============================================================
 # Main program
