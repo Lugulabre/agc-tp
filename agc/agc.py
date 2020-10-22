@@ -23,13 +23,13 @@ from collections import Counter
 # ftp://ftp.ncbi.nih.gov/blast/matrices/
 import nwalign3 as nw
 
-__author__ = "Your Name"
+__author__ = "Maël Pretet"
 __copyright__ = "Universite Paris Diderot"
-__credits__ = ["Your Name"]
+__credits__ = ["Pretet"]
 __license__ = "GPL"
 __version__ = "1.0.0"
-__maintainer__ = "Your Name"
-__email__ = "your@email.fr"
+__maintainer__ = "Pretet"
+__email__ = "pretetmael@gmail.com"
 __status__ = "Developpement"
 
 
@@ -68,6 +68,47 @@ def get_arguments():
     parser.add_argument('-o', '-output_file', dest='output_file', type=str,
                         default="OTU.fasta", help="Output file")
     return parser.parse_args()
+
+
+def read_fasta(amplicon_file, minseqlen):
+    if amplicon_file.endswith("gz"):
+        filin = gzip.open(amplicon_file, "r")
+    else:
+        filin = open(amplicon_file, "r")
+
+    seq = ""
+    for line in filin:
+        if line.startswith(">"):
+            if len(seq) >= minseqlen:
+                yield seq
+            seq = ""
+        else:
+            seq += line.strip()
+    
+    yield seq
+    filin.close()
+
+
+
+def dereplication_fulllength(amplicon_file, minseqlen, mincount):
+    dict_amplicon = {}
+    for amplicon in read_fasta(amplicon_file, minseqlen):
+        if not amplicon in dict_amplicon.keys():
+            dict_amplicon[amplicon] = 1
+        else:
+            dict_amplicon[amplicon] += 1
+
+    for key, value in sorted(dict_amplicon.items(), key=lambda x: x[1], reverse = True):
+        if value >= mincount:
+            yield [key, value]
+
+
+def get_chunks(sequence, chunk_size):
+    pass
+
+
+def cut_kmer(sequence, kmer_size):
+    pass
 
 #==============================================================
 # Main program
