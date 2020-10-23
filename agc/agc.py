@@ -220,13 +220,15 @@ def abundance_greedy_clustering(amplicon_file, minseqlen, mincount, chunk_size, 
             greedy_cluster.append((amplicon[0], amplicon[1]))
         else:
             flag_dico = True
-            for tupple in greedy_cluster:
+            for i,tupple in enumerate(greedy_cluster):
                 align_tmp = nw.global_align(amplicon[0], tupple[0], 
                             gap_open=-1, gap_extend=-1,
                             matrix=os.path.abspath(os.path.join(os.path.dirname(__file__),
                             '../agc')) + "/MATCH")
                 if get_identity(align_tmp) > 97:
-                    #tupple[1] += amplicon[1]
+                    list_tmp = list(greedy_cluster[i])
+                    list_tmp[1] = list_tmp[1] + amplicon[1]
+                    greedy_cluster[i] = tuple(list_tmp)
                     flag_dico = False
 
             if flag_dico:
